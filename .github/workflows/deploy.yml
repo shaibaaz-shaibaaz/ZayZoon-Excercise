@@ -1,0 +1,74 @@
+name: Deploy to AWS CloudFormation and ECS
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+
+permissions:
+  id-token: write   
+  contents: read     
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+      
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      timeout-minutes: 2 
+      with:
+        role-to-assume: arn:aws:iam::083846066460:role/Zayzoon-Role
+        aws-region: us-east-1
+        role-session-name: GitHubActionsSession
+        audience: sts.amazonaws.com
+
+    - name: Set Environment Variable
+      id: set-env
+      run: |
+        if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+          echo "ENV=prod" >> $GITHUB_ENV
+        else
+          echo "ENV=dev" >> $GITHUB_ENV
+        fi
+
+    - name: Deploy CloudFormation Stack
+      run: |
+        aws cloudformation deploy \
+          --stack-name zayzoon-stack-${{ env.ENV }} \
+          --template-file infra/cloudformation.yaml \
+          --parameter-overrides Environment=${{ env.ENV }} \
+          --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM
+
+    - name: Wait for CloudFormation Stack to Complete
+      run: |
+        aws cloudformation wait stack-create-complete --stack-name zayzoon-stack-${{ env.ENV }} || \
+        aws cloudformation wait stack-update-complete --stack-name zayzoon-stack-${{ env.ENV }}
+
+    - name: Build Docker Image
+      run: |
+        docker build -t zayzoon-flask-app:${{ github.sha }} -f app/Dockerfile app/
+
+    - name: Login to Amazon ECR
+      run: |
+        aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 083846066460.dkr.ecr.us-east-1.amazonaws.com
+
+    - name: Push Docker Image to ECR
+      run: |
+        docker tag zayzoon-flask-app:${{ github.sha }} 083846066460.dkr.ecr.us-east-1.amazonaws.com/zayzoon-flask-app:${{ github.sha }}
+        docker push 083846066460.dkr.ecr.us-east-1.amazonaws.com/zayzoon-flask-app:${{ github.sha }}
+
+    - name: Update ECS Service with New Image
+      run: |
+        CLUSTER_NAME=$(aws cloudformation describe-stacks --stack-name zayzoon-stack-${{ env.ENV }} --query "Stacks[0].Outputs[?OutputKey=='ECSClusterName'].OutputValue" --output text)
+        SERVICE_NAME=$(aws cloudformation describe-stacks --stack-name zayzoon-stack-${{ env.ENV }} --query "Stacks[0].Outputs[?OutputKey=='ECSServiceName'].OutputValue" --output text)
+
+        aws ecs update-service \
+          --cluster $CLUSTER_NAME \
+          --service $SERVICE_NAME \
+          --force-new-deployment \
+          --desired-count 1
