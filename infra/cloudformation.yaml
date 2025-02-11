@@ -21,9 +21,15 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "Zayzoon-VPC-${Environment}"
+        - Key: Environment
+          Value: !Ref Environment
 
   InternetGateway:
     Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
 
   VPCGatewayAttachment:
     Type: AWS::EC2::VPCGatewayAttachment
@@ -39,6 +45,11 @@ Resources:
       CidrBlock: 10.0.1.0/24
       MapPublicIpOnLaunch: true
       AvailabilityZone: !Select [ 0, !GetAZs ]
+      Tags:
+        - Key: Name
+          Value: !Sub "Zayzoon-Subnet1-${Environment}"
+        - Key: Environment
+          Value: !Ref Environment
     DependsOn: VPC
 
   PublicSubnet2:
@@ -48,12 +59,20 @@ Resources:
       CidrBlock: 10.0.2.0/24
       MapPublicIpOnLaunch: true
       AvailabilityZone: !Select [ 1, !GetAZs ]
+      Tags:
+        - Key: Name
+          Value: !Sub "Zayzoon-Subnet2-${Environment}"
+        - Key: Environment
+          Value: !Ref Environment
     DependsOn: VPC
 
   RouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref VPC
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
     DependsOn: VPC
 
   Route:
@@ -81,20 +100,19 @@ Resources:
   SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Allow HTTP and ECS Task communication
+      GroupDescription: Allow HTTPS and ECS Task communication
       VpcId: !Ref VPC
       SecurityGroupIngress:
         - IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 5000
-          ToPort: 5000
+          FromPort: 443
+          ToPort: 443
           CidrIp: 0.0.0.0/0
       SecurityGroupEgress:
         - IpProtocol: -1
           CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
     DependsOn: VPC
 
   ## CloudWatch Log Group ##
@@ -103,6 +121,9 @@ Resources:
     Properties:
       LogGroupName: !Sub "/ecs/zayzoon-flask-app-${Environment}"
       RetentionInDays: 14
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
 
   ## Application Load Balancer ##
   LoadBalancer:
@@ -115,6 +136,9 @@ Resources:
       SecurityGroups:
         - !Ref SecurityGroup
       Scheme: internet-facing
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
     DependsOn: 
       - SubnetRouteTableAssociation1
       - SubnetRouteTableAssociation2
@@ -123,74 +147,38 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       VpcId: !Ref VPC
-      Port: 5000
-      Protocol: HTTP
+      Port: 443
+      Protocol: HTTPS
       TargetType: ip
       HealthCheckPath: /health
       HealthCheckIntervalSeconds: 20
       HealthCheckTimeoutSeconds: 5
       HealthyThresholdCount: 2
       UnhealthyThresholdCount: 2
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
     DependsOn: LoadBalancer
 
   Listener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
       LoadBalancerArn: !Ref LoadBalancer
-      Port: 80
-      Protocol: HTTP
+      Port: 443
+      Protocol: HTTPS
       DefaultActions:
         - Type: forward
           TargetGroupArn: !Ref TargetGroup
     DependsOn: TargetGroup
-
-  ## IAM Roles for ECS ##
-  ECSExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub "ZayzoonECSExecutionRole-${Environment}"
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: 
-                - ecs-tasks.amazonaws.com
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
-
-  ECSTaskRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub "ZayzoonECSTaskRole-${Environment}"
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: 
-                - ecs-tasks.amazonaws.com
-            Action: sts:AssumeRole
-      Policies:
-        - PolicyName: ECSTaskPolicy
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - s3:ListBucket
-                  - s3:GetObject
-                  - logs:CreateLogGroup
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource: "*"
 
   ## ECS Cluster ##
   ECSCluster:
     Type: AWS::ECS::Cluster
     Properties:
       ClusterName: !Sub "ZayzoonCluster-${Environment}"
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
     DependsOn: VPC
 
   ## ECS Task Definition ##
@@ -198,8 +186,6 @@ Resources:
     Type: AWS::ECS::TaskDefinition
     Properties:
       Family: !Sub "zayzoon-task-${Environment}"
-      TaskRoleArn: !GetAtt ECSTaskRole.Arn
-      ExecutionRoleArn: !GetAtt ECSExecutionRole.Arn
       NetworkMode: awsvpc
       RequiresCompatibilities:
         - FARGATE
@@ -209,7 +195,7 @@ Resources:
         - Name: !Sub "zayzoon-container-${Environment}"
           Image: "083846066460.dkr.ecr.us-east-1.amazonaws.com/zayzoon-flask-app:latest"
           PortMappings:
-            - ContainerPort: 5000
+            - ContainerPort: 443
               Protocol: tcp
           Essential: true
           LogConfiguration:
@@ -240,7 +226,10 @@ Resources:
       LoadBalancers:
         - TargetGroupArn: !Ref TargetGroup
           ContainerName: !Sub "zayzoon-container-${Environment}"
-          ContainerPort: 5000
+          ContainerPort: 443
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
     DependsOn:
       - Listener
       - ECSTaskDefinition
@@ -252,9 +241,12 @@ Resources:
       MaxCapacity: 4
       MinCapacity: 1
       ResourceId: !Sub "service/${ECSCluster}/${ECSServiceName}-${Environment}"
-      RoleARN: !GetAtt ECSExecutionRole.Arn
+      RoleARN: !GetAtt ECSCluster.Arn
       ScalableDimension: ecs:service:DesiredCount
       ServiceNamespace: ecs
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
     DependsOn: ECSService
 
   AutoScalingPolicy:
@@ -272,30 +264,18 @@ Resources:
     DependsOn: AutoScalingTarget
 
 Outputs:
-  VPCID:
-    Description: VPC ID
-    Value: !Ref VPC
+  LoadBalancerDNS:
+    Description: Load Balancer DNS Name
+    Value: !GetAtt LoadBalancer.DNSName
 
   ECSClusterName:
     Description: ECS Cluster Name
     Value: !Ref ECSCluster
 
-  ECSTaskRoleARN:
-    Description: Task Role ARN
-    Value: !GetAtt ECSTaskRole.Arn
-
-  ECSExecutionRoleARN:
-    Description: Execution Role ARN
-    Value: !GetAtt ECSExecutionRole.Arn
-
-  LoadBalancerDNS:
-    Description: Load Balancer DNS Name
-    Value: !GetAtt LoadBalancer.DNSName
+  ECSServiceName:
+    Description: The ECS Service Name
+    Value: !Ref ECSService
 
   CloudWatchLogGroup:
     Description: CloudWatch Log Group
     Value: !Ref CloudWatchLogGroup
-  
-  ECSServiceName:
-    Description: "The ECS Service Name"
-    Value: !Ref ECSService
