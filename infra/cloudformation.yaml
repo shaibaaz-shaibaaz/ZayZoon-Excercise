@@ -244,9 +244,6 @@ Resources:
       RoleARN: !GetAtt ECSCluster.Arn
       ScalableDimension: ecs:service:DesiredCount
       ServiceNamespace: ecs
-      Tags:
-        - Key: Environment
-          Value: !Ref Environment
     DependsOn: ECSService
 
   AutoScalingPolicy:
