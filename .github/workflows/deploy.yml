@@ -33,8 +33,10 @@ jobs:
       run: |
         if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
           echo "ENV=prod" >> $GITHUB_ENV
-        else
+        elif [[ "${{ github.ref }}" == "refs/heads/dev" ]]; then
           echo "ENV=dev" >> $GITHUB_ENV
+        else
+          echo "ENV=feature" >> $GITHUB_ENV
         fi
 
     - name: Deploy CloudFormation Stack
