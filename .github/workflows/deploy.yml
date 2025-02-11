@@ -54,7 +54,8 @@ jobs:
 
     - name: Build Docker Image
       run: |
-        docker build -t zayzoon-flask-app:${{ github.sha }} -f app/Dockerfile app/
+        cd app/
+        docker build -t zayzoon-flask-app . -f app/Dockerfile app/
 
     - name: Login to Amazon ECR
       run: |
@@ -62,8 +63,8 @@ jobs:
 
     - name: Push Docker Image to ECR
       run: |
-        docker tag zayzoon-flask-app:${{ github.sha }} 083846066460.dkr.ecr.us-east-1.amazonaws.com/zayzoon-flask-app:${{ github.sha }}
-        docker push 083846066460.dkr.ecr.us-east-1.amazonaws.com/zayzoon-flask-app:${{ github.sha }}
+        docker tag zayzoon-flask-app:latest 083846066460.dkr.ecr.us-east-1.amazonaws.com/zayzoon-flask-app:latest
+        docker push 083846066460.dkr.ecr.us-east-1.amazonaws.com/zayzoon-flask-app:latest
 
     - name: Update ECS Service with New Image
       run: |
