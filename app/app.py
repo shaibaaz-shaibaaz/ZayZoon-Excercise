@@ -1,8 +1,9 @@
+import os
+import time
 from flask import Flask, jsonify, request, redirect, render_template_string
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.middleware.proxy_fix import ProxyFix
-import time
 
 app = Flask(__name__)
 
@@ -10,13 +11,13 @@ app = Flask(__name__)
 limiter = Limiter(
     get_remote_address,
     app=app,
-    default_limits=["100 per minute"]  # Adjust as needed
+    default_limits=["100 per minute"]
 )
 
-# Apply ProxyFix to correctly interpret forwarded headers from the load balancer
+# Apply ProxyFix to correctly interpret forwarded headers
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
 
-# Redirect HTTP to HTTPS if the 'X-Forwarded-Proto' header is not 'https'
+# Redirect HTTP to HTTPS based on the 'X-Forwarded-Proto' header
 @app.before_request
 def enforce_https():
     if request.headers.get('X-Forwarded-Proto', 'http') != 'https':
@@ -58,12 +59,12 @@ template = """
 """
 
 @app.route("/status", methods=["GET"])
-@limiter.limit("10 per minute")  # Rate limit this endpoint
+@limiter.limit("10 per minute")
 def status():
     return render_template_string(template, title="Status", message="Zayzoon rocking here! 🚀", timestamp=int(time.time()))
 
 @app.route("/health", methods=["GET"])
-@limiter.limit("10 per minute")  # Rate limit this endpoint
+@limiter.limit("10 per minute")
 def health():
     return render_template_string(template, title="Health Check", message="Status: Healthy ✅", timestamp=int(time.time()))
 
@@ -81,5 +82,6 @@ def internal_error(e):
     return jsonify(error="An unexpected error occurred."), 500
 
 if __name__ == "__main__":
-    # Run without SSL context since TLS is terminated at the ALB
-    app.run(host="0.0.0.0", port=8443)
+    # Use the PORT environment variable if set, otherwise default to 8443
+    port = int(os.environ.get("PORT", 8443))
+    app.run(host="0.0.0.0", port=port)
