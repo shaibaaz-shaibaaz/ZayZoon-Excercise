@@ -13,6 +13,6 @@ RUN which gunicorn
 COPY . .
 
 
-EXPOSE 443
+EXPOSE 8443
 
-CMD ["gunicorn", "-b", "0.0.0.0:443", "app:app", "--certfile=certificate.pem", "--keyfile=private-key.pem"]
+CMD ["gunicorn", "-b", "0.0.0.0:8443", "app:app", "--certfile=certificate.pem", "--keyfile=private-key.pem"]
