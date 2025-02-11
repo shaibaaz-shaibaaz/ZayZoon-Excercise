@@ -82,4 +82,4 @@ def internal_error(e):
 
 if __name__ == "__main__":
     # Running on all interfaces with SSL context
-    app.run(host="0.0.0.0", port=443, ssl_context=('certificate.pem', 'private-key.pem'))
+    app.run(host="0.0.0.0", port=8443, ssl_context=('certificate.pem', 'private-key.pem'))
