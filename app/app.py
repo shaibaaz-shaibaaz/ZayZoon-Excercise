@@ -13,10 +13,10 @@ limiter = Limiter(
     default_limits=["100 per minute"]  # Adjust as needed
 )
 
-# Force HTTPS if behind a proxy
+# Apply ProxyFix to correctly interpret forwarded headers from the load balancer
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
 
-# Redirect HTTP to HTTPS
+# Redirect HTTP to HTTPS if the 'X-Forwarded-Proto' header is not 'https'
 @app.before_request
 def enforce_https():
     if request.headers.get('X-Forwarded-Proto', 'http') != 'https':
@@ -81,5 +81,5 @@ def internal_error(e):
     return jsonify(error="An unexpected error occurred."), 500
 
 if __name__ == "__main__":
-    # Running on all interfaces with SSL context
-    app.run(host="0.0.0.0", port=8443, ssl_context=('certificate.pem', 'private-key.pem'))
+    # Run without SSL context since TLS is terminated at the ALB
+    app.run(host="0.0.0.0", port=8443)

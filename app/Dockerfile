@@ -10,4 +10,5 @@ COPY . .
 
 EXPOSE 8443
 
-CMD ["gunicorn", "-b", "0.0.0.0:8443", "app:app", "--certfile=certificate.pem", "--keyfile=private-key.pem"]
+# Run Gunicorn without certificate options (HTTP only)
+CMD ["gunicorn", "-b", "0.0.0.0:8443", "app:app"]
