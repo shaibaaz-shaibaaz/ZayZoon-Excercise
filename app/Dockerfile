@@ -12,8 +12,6 @@ RUN which gunicorn
 
 COPY . .
 
-RUN adduser --disabled-password appuser
-USER appuser
 
 EXPOSE 443
 
