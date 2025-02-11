@@ -228,10 +228,6 @@ Resources:
               awslogs-group: !Ref CloudWatchLogGroup
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: zayzoon
-          LinuxParameters:
-            Capabilities:
-              Add:
-                - NET_BIND_SERVICE
     DependsOn: ECSCluster
 
   ## ECS Service ##
