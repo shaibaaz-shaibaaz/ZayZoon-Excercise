@@ -219,6 +219,7 @@ Resources:
 
 
     ## ECS Task Definition ##
+    ## ECS Task Definition ##
   ECSTaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
@@ -275,6 +276,7 @@ Resources:
       - ECSCluster
       - CloudWatchLogGroup
       - RedisLogGroup
+
 
 
   ## ECS Service ##
