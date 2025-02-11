@@ -8,6 +8,10 @@ Parameters:
   Environment:
     Type: String
     Default: "dev"
+  SSLCertificateArn:
+    Type: String
+    Description: "The ARN of the SSL certificate for HTTPS listener"
+    Default: "arn:aws:acm:us-east-1:083846066460:certificate/b762167e-c48f-42e0-851f-8aa386218761"
 
 Resources:
 
@@ -183,6 +187,8 @@ Resources:
       LoadBalancerArn: !Ref LoadBalancer
       Port: 443
       Protocol: HTTPS
+      Certificates:
+        - CertificateArn: !Ref SSLCertificateArn
       DefaultActions:
         - Type: forward
           TargetGroupArn: !Ref TargetGroup
