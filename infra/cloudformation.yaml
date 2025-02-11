@@ -217,7 +217,8 @@ Resources:
           Value: !Ref Environment
     DependsOn: VPC
 
-  ## ECS Task Definition ##
+
+    ## ECS Task Definition ##
   ECSTaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
@@ -239,6 +240,10 @@ Resources:
               Value: "redis://localhost:6379/0"
             - Name: PORT
               Value: "8443"
+          # Add a dependency: wait until the "redis" container is healthy.
+          DependsOn:
+            - ContainerName: redis
+              Condition: HEALTHY
           Essential: true
           LogConfiguration:
             LogDriver: awslogs
@@ -246,12 +251,20 @@ Resources:
               awslogs-group: !Ref CloudWatchLogGroup
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: zayzoon
+
         - Name: redis
           Image: "redis:6.2"
           Essential: true
           PortMappings:
             - ContainerPort: 6379
               Protocol: tcp
+          # Define a health check for Redis
+          HealthCheck:
+            Command: ["CMD", "redis-cli", "ping"]
+            Interval: 30
+            Timeout: 5
+            Retries: 3
+            StartPeriod: 30
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -262,6 +275,7 @@ Resources:
       - ECSCluster
       - CloudWatchLogGroup
       - RedisLogGroup
+
 
   ## ECS Service ##
   ECSService:
