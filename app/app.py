@@ -1,5 +1,6 @@
 import os
 import time
+import sys
 from flask import Flask, jsonify, request, redirect, render_template_string
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -8,16 +9,33 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 app = Flask(__name__)
 
 # Determine the storage backend for rate limiting.
-# In production, set the REDIS_URL environment variable to your Redis instance URI.
 redis_storage_uri = os.environ.get("REDIS_URL")
 if not redis_storage_uri:
     app.logger.warning(
-        "No REDIS_URL environment variable set; "
-        "falling back to in-memory storage for rate limiting. "
-        "This is not recommended for production. "
-        "See https://flask-limiter.readthedocs.io#configuring-a-storage-backend for details."
+        "No REDIS_URL environment variable set; falling back to in-memory storage for rate limiting. "
+        "This is not recommended for production."
     )
     redis_storage_uri = "memory://"
+
+# If using Redis, try to connect before proceeding.
+if redis_storage_uri.startswith("redis://"):
+    import redis
+    max_retries = 5
+    for attempt in range(max_retries):
+        try:
+            r = redis.Redis.from_url(redis_storage_uri)
+            r.ping()
+            app.logger.info("Connected to Redis on attempt %s/%s", attempt + 1, max_retries)
+            break
+        except Exception as e:
+            app.logger.warning("Could not connect to Redis (attempt %s/%s): %s", attempt + 1, max_retries, e)
+            time.sleep(2)
+    else:
+        app.logger.error("Failed to connect to Redis after %s attempts. Exiting.", max_retries)
+        # Option 1: Exit the application so ECS can restart the task.
+        sys.exit(1)
+        # Option 2: Alternatively, fall back to in-memory storage:
+        # redis_storage_uri = "memory://"
 
 # Configure Flask-Limiter with the chosen storage backend.
 limiter = Limiter(
@@ -27,7 +45,7 @@ limiter = Limiter(
     default_limits=["100 per minute"]
 )
 
-# Apply ProxyFix to correctly interpret forwarded headers from your load balancer.
+# Apply ProxyFix to correctly interpret forwarded headers.
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
 
 # Redirect HTTP to HTTPS based on the 'X-Forwarded-Proto' header.
@@ -105,6 +123,5 @@ def internal_error(e):
     return jsonify(error="An unexpected error occurred."), 500
 
 if __name__ == "__main__":
-    # Use the PORT environment variable if set, otherwise default to 8443.
     port = int(os.environ.get("PORT", 8443))
     app.run(host="0.0.0.0", port=port)
