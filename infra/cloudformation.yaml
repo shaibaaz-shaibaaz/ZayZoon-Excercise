@@ -111,6 +111,10 @@ Resources:
           FromPort: 443
           ToPort: 443
           CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 8443
+          ToPort: 8443
+          CidrIp: 0.0.0.0/0
       SecurityGroupEgress:
         - IpProtocol: -1
           CidrIp: 0.0.0.0/0
@@ -169,7 +173,7 @@ Resources:
     Properties:
       VpcId: !Ref VPC
       Port: 8443
-      Protocol: HTTPS
+      Protocol: HTTP
       TargetType: ip
       HealthCheckPath: /health
       HealthCheckIntervalSeconds: 20
@@ -259,13 +263,43 @@ Resources:
       - ECSTaskDefinition
 
   ## Auto Scaling ##
+  AutoScalingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: application-autoscaling.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ECSServiceAutoScalingPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecs:DescribeServices
+                  - ecs:UpdateService
+                Resource: !Sub "arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:service/${ECSCluster}/${ECSServiceName}-${Environment}"
+              - Effect: Allow
+                Action:
+                  - cloudwatch:DescribeAlarms
+                  - cloudwatch:PutMetricAlarm
+                  - cloudwatch:DeleteAlarms
+                Resource: "*"
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
   AutoScalingTarget:
     Type: AWS::ApplicationAutoScaling::ScalableTarget
     Properties:
       MaxCapacity: 4
       MinCapacity: 1
       ResourceId: !Sub "service/${ECSCluster}/${ECSServiceName}-${Environment}"
-      RoleARN: !GetAtt ECSCluster.Arn
+      RoleARN: !GetAtt AutoScalingRole.Arn
       ScalableDimension: ecs:service:DesiredCount
       ServiceNamespace: ecs
     DependsOn: ECSService
