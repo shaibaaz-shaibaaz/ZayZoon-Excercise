@@ -15,6 +15,6 @@ COPY . .
 RUN adduser --disabled-password appuser
 USER appuser
 
-EXPOSE 8443
+EXPOSE 443
 
-CMD ["gunicorn", "-b", "0.0.0.0:8443", "app:app", "--certfile=certificate.pem", "--keyfile=private-key.pem"]
+CMD ["gunicorn", "-b", "0.0.0.0:443", "app:app", "--certfile=certificate.pem", "--keyfile=private-key.pem"]
