@@ -250,7 +250,7 @@ Resources:
       LoadBalancers:
         - TargetGroupArn: !Ref TargetGroup
           ContainerName: !Sub "zayzoon-container-${Environment}"
-          ContainerPort: 8443
+          ContainerPort: 443
       Tags:
         - Key: Environment
           Value: !Ref Environment
