@@ -95,7 +95,7 @@ def status():
     return render_template_string(
         template,
         title="Status",
-        message="Zayzoon rocking here! 🚀",
+        message="Zayzoon rocking here Zayzoon rocking here! 🚀",
         timestamp=int(time.time())
     )
 
