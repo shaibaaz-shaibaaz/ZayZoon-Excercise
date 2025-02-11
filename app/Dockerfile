@@ -18,8 +18,5 @@ USER appuser
 # Expose HTTPS port
 EXPOSE 443
 
-# Add a health check
-HEALTHCHECK CMD curl --fail https://localhost/health || exit 1
-
-# Run the Flask app
-CMD ["python", "app.py"]
+# Run the Flask app with Gunicorn in production mode
+CMD ["gunicorn", "-b", "0.0.0.0:443", "app:app", "--certfile=certificate.pem", "--keyfile=private-key.pem"]

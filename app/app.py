@@ -27,6 +27,7 @@ def enforce_https():
 @app.after_request
 def set_security_headers(response):
     response.headers['Content-Security-Policy'] = "default-src 'self'"
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains; preload'
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['X-XSS-Protection'] = '1; mode=block'
@@ -59,12 +60,12 @@ template = """
 @app.route("/status", methods=["GET"])
 @limiter.limit("10 per minute")  # Rate limit this endpoint
 def status():
-    return render_template_string(template, title="Status", message="Zayzoon rocking here!", timestamp=int(time.time()))
+    return render_template_string(template, title="Status", message="Zayzoon rocking here! 🚀", timestamp=int(time.time()))
 
 @app.route("/health", methods=["GET"])
 @limiter.limit("10 per minute")  # Rate limit this endpoint
 def health():
-    return render_template_string(template, title="Health Check", message="Status: Healthy", timestamp=int(time.time()))
+    return render_template_string(template, title="Health Check", message="Status: Healthy ✅", timestamp=int(time.time()))
 
 # Custom error handling
 @app.errorhandler(429)
@@ -80,4 +81,5 @@ def internal_error(e):
     return jsonify(error="An unexpected error occurred."), 500
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=443, ssl_context=('cert.pem', 'key.pem'))
+    # Running on all interfaces with SSL context
+    app.run(host="0.0.0.0", port=443, ssl_context=('certificate.pem', 'private-key.pem'))
