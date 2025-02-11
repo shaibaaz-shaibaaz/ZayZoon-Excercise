@@ -168,7 +168,7 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       VpcId: !Ref VPC
-      Port: 443
+      Port: 8443
       Protocol: HTTPS
       TargetType: ip
       HealthCheckPath: /health
@@ -219,7 +219,7 @@ Resources:
         - Name: !Sub "zayzoon-container-${Environment}"
           Image: "083846066460.dkr.ecr.us-east-1.amazonaws.com/zayzoon-flask-app:latest"
           PortMappings:
-            - ContainerPort: 443
+            - ContainerPort: 8443
               Protocol: tcp
           Essential: true
           LogConfiguration:
@@ -228,6 +228,10 @@ Resources:
               awslogs-group: !Ref CloudWatchLogGroup
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: zayzoon
+          LinuxParameters:
+            Capabilities:
+              Add:
+                - NET_BIND_SERVICE
     DependsOn: ECSCluster
 
   ## ECS Service ##
@@ -250,7 +254,7 @@ Resources:
       LoadBalancers:
         - TargetGroupArn: !Ref TargetGroup
           ContainerName: !Sub "zayzoon-container-${Environment}"
-          ContainerPort: 443
+          ContainerPort: 8443
       Tags:
         - Key: Environment
           Value: !Ref Environment
