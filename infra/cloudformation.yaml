@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: AWS ECS Fargate Deployment for Zayzoon SRE Exercise with Load Balancer
+Description: AWS ECS Fargate Deployment for Zayzoon SRE Exercise with Load Balancer (Multi-container Task with Redis)
 
 Parameters:
   ECSServiceName:
@@ -164,7 +164,7 @@ Resources:
       Tags:
         - Key: Environment
           Value: !Ref Environment
-    DependsOn: 
+    DependsOn:
       - SubnetRouteTableAssociation1
       - SubnetRouteTableAssociation2
 
@@ -225,6 +225,11 @@ Resources:
           PortMappings:
             - ContainerPort: 8443
               Protocol: tcp
+          Environment:
+            - Name: REDIS_URL
+              Value: "redis://localhost:6379/0"
+            - Name: PORT
+              Value: "8443"
           Essential: true
           LogConfiguration:
             LogDriver: awslogs
@@ -232,6 +237,18 @@ Resources:
               awslogs-group: !Ref CloudWatchLogGroup
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: zayzoon
+        - Name: redis
+          Image: "redis:6.2"
+          Essential: true
+          PortMappings:
+            - ContainerPort: 6379
+              Protocol: tcp
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub "/ecs/redis-${Environment}"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: redis
     DependsOn: ECSCluster
 
   ## ECS Service ##

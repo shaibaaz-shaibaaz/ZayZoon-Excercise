@@ -7,34 +7,47 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 app = Flask(__name__)
 
-# Apply rate limiting to prevent abuse
+# Determine the storage backend for rate limiting.
+# In production, set the REDIS_URL environment variable to your Redis instance URI.
+redis_storage_uri = os.environ.get("REDIS_URL")
+if not redis_storage_uri:
+    app.logger.warning(
+        "No REDIS_URL environment variable set; "
+        "falling back to in-memory storage for rate limiting. "
+        "This is not recommended for production. "
+        "See https://flask-limiter.readthedocs.io#configuring-a-storage-backend for details."
+    )
+    redis_storage_uri = "memory://"
+
+# Configure Flask-Limiter with the chosen storage backend.
 limiter = Limiter(
-    get_remote_address,
+    key_func=get_remote_address,
     app=app,
+    storage_uri=redis_storage_uri,
     default_limits=["100 per minute"]
 )
 
-# Apply ProxyFix to correctly interpret forwarded headers
+# Apply ProxyFix to correctly interpret forwarded headers from your load balancer.
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
 
-# Redirect HTTP to HTTPS based on the 'X-Forwarded-Proto' header
+# Redirect HTTP to HTTPS based on the 'X-Forwarded-Proto' header.
 @app.before_request
 def enforce_https():
-    if request.headers.get('X-Forwarded-Proto', 'http') != 'https':
-        url = request.url.replace('http://', 'https://', 1)
+    if request.headers.get("X-Forwarded-Proto", "http") != "https":
+        url = request.url.replace("http://", "https://", 1)
         return redirect(url, code=301)
 
-# Add security headers
+# Add security headers.
 @app.after_request
 def set_security_headers(response):
-    response.headers['Content-Security-Policy'] = "default-src 'self'"
-    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains; preload'
-    response.headers['X-Content-Type-Options'] = 'nosniff'
-    response.headers['X-Frame-Options'] = 'DENY'
-    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers["Content-Security-Policy"] = "default-src 'self'"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
     return response
 
-# Template for a simple UI
+# Template for a simple UI.
 template = """
 <!DOCTYPE html>
 <html lang="en">
@@ -59,16 +72,26 @@ template = """
 """
 
 @app.route("/status", methods=["GET"])
-@limiter.limit("10 per minute")
+@limiter.limit("10 per minute")  # Rate limit this endpoint.
 def status():
-    return render_template_string(template, title="Status", message="Zayzoon rocking here! 🚀", timestamp=int(time.time()))
+    return render_template_string(
+        template,
+        title="Status",
+        message="Zayzoon rocking here! 🚀",
+        timestamp=int(time.time())
+    )
 
 @app.route("/health", methods=["GET"])
-@limiter.limit("10 per minute")
+@limiter.limit("10 per minute")  # Rate limit this endpoint.
 def health():
-    return render_template_string(template, title="Health Check", message="Status: Healthy ✅", timestamp=int(time.time()))
+    return render_template_string(
+        template,
+        title="Health Check",
+        message="Status: Healthy ✅",
+        timestamp=int(time.time())
+    )
 
-# Custom error handling
+# Custom error handling.
 @app.errorhandler(429)
 def rate_limit_exceeded(e):
     return jsonify(error="Too many requests. Please try again later."), 429
@@ -82,6 +105,6 @@ def internal_error(e):
     return jsonify(error="An unexpected error occurred."), 500
 
 if __name__ == "__main__":
-    # Use the PORT environment variable if set, otherwise default to 8443
+    # Use the PORT environment variable if set, otherwise default to 8443.
     port = int(os.environ.get("PORT", 8443))
     app.run(host="0.0.0.0", port=port)
