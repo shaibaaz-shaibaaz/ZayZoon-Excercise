@@ -259,6 +259,7 @@ Resources:
           PortMappings:
             - ContainerPort: 6379
               Protocol: tcp
+          Command: ["redis-server", "--save", "", "--appendonly", "no"]
           # Define a health check for Redis
           HealthCheck:
             Command: ["CMD", "redis-cli", "ping"]

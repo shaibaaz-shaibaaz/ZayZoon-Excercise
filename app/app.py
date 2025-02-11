@@ -32,10 +32,7 @@ if redis_storage_uri.startswith("redis://"):
             time.sleep(2)
     else:
         app.logger.error("Failed to connect to Redis after %s attempts. Exiting.", max_retries)
-        # Option 1: Exit the application so ECS can restart the task.
         sys.exit(1)
-        # Option 2: Alternatively, fall back to in-memory storage:
-        # redis_storage_uri = "memory://"
 
 # Configure Flask-Limiter with the chosen storage backend.
 limiter = Limiter(
@@ -51,6 +48,9 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
 # Redirect HTTP to HTTPS based on the 'X-Forwarded-Proto' header.
 @app.before_request
 def enforce_https():
+    # Skip HTTPS redirection for health check requests.
+    if request.path == "/health":
+        return
     if request.headers.get("X-Forwarded-Proto", "http") != "https":
         url = request.url.replace("http://", "https://", 1)
         return redirect(url, code=301)
